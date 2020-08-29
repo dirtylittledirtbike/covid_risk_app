@@ -34,7 +34,7 @@ def get_risk(df1, df2, states, counties, bias, max_group_size):
     new_dfs = []
     for i in range(len(states)):
         df = pd.DataFrame({'Risk': prob_arrs[i]})
-        df['State/County'] = states[i] + '-' + counties[i]
+        df['State/County'] = states[i] + ': ' + counties[i]
         new_dfs.append(df)
     
     risk_df = pd.concat(new_dfs)
