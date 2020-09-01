@@ -14,6 +14,9 @@ covid_df = covid_df[(covid_df.county !='Unknown') & (covid_df.state != 'Puerto R
 census_df = pd.read_csv('https://raw.githubusercontent.com/dirtylittledirtbike/census_data/master/census_formatted3.csv')
 county_state_vals = covid_df.state + ': ' + covid_df.county
 
+covid_df['location'] = covid_df.state + ': ' + covid_df.county
+census_df['location'] = census_df.state + ': ' + census_df.county
+
 HERE = Path(__file__).parent
 app = dash.Dash()
 app.title = '🎠'
@@ -79,21 +82,13 @@ app.layout = html.Div(
 def update_graph(n_clicks, state_county, bias, group_size):
 #    try:
     max_group_size = int(group_size)
-    region_info = [x.split(': ') for x in state_county]
-    counties = []
-    states = []
-
-    for val in region_info:
-        states.append(val[0])
-        counties.append(val[1])
-
-    risk_df = get_risk(census_df, covid_df, states, counties, bias, max_group_size)
+    risk_df = get_risk(census_df, covid_df, state_county, int(bias), max_group_size)
     time_series_df = get_time_series(covid_df, state_county, int(bias))
-
+    
     fig = px.line(risk_df,
                   x="Group_Size",
                   y="Risk",
-                  color='State/County',
+                  color='location',
                   width=650,
                   height=550,
                   title="Current Covid Risk % by Group Size")
@@ -123,9 +118,9 @@ def update_graph(n_clicks, state_county, bias, group_size):
                    y="new cases",
                    width=550,
                    height=450,
-                   facet_col="state_county",
+                   facet_col="location",
                    facet_col_wrap=1,
-                   color='state_county')
+                   color='location')
 
 #    fig2.update_layout(
 #                       legend=dict(
@@ -142,6 +137,7 @@ def update_graph(n_clicks, state_county, bias, group_size):
 #                                   )
 #                      )
     fig2.update_yaxes(matches=None)
+    fig2.update_layout(showlegend=False)
 #    fig.show()
 
 
