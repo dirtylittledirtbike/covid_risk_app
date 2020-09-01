@@ -8,7 +8,9 @@ from src.process_data import get_risk
 from src.process_data2 import get_time_series
 import plotly.express as px
 import flask
+import plotly
 
+print(plotly.__version__)
 # --- preprocessing ---
 covid_df = pd.read_csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv')
 covid_df = covid_df[(covid_df.county !='Unknown') & (covid_df.state != 'Puerto Rico') & (covid_df.state != 'Virgin Islands')].copy()
