@@ -5,6 +5,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import pandas as pd
 from src.process_data import get_risk
+from src.process_data2 import get_time_series
 import plotly.express as px
 import flask
 
@@ -29,6 +30,7 @@ app.layout = html.Div(
                                  html.Label('Estimation Bias:'),
                                  dcc.Dropdown(id='bias', value='10',
                                               options=[
+                                                       {'label': 'None', 'value': '1'},
                                                        {'label': 'Conservative', 'value': '5'},
                                                        {'label': 'Moderate', 'value': '10'},
                                                        {'label': 'Aggressive', 'value': '20'}
@@ -45,12 +47,14 @@ app.layout = html.Div(
                                 style={'width':'30%', 'height':'auto', 'display':'grid', 'width':'40%'}
                                 ),
                        
-                       html.Div(id='output-graph'),
+                       html.Div(id='output-graph', style = {'display':'flex'}),
+#                       html.Div(id='output-graph', style = {'columnCount': 2, 'height':'auto', 'width':'auto'}),
+#                       html.Div(id='output-graph2'),
                        
                        html.P(' ', style={"height": "auto","margin-bottom": "auto", "font-size":"35px"}),
                        
                        dcc.Markdown(
-                                    ">Estimation Bias = The value we multiply the number of active cases by to account for under reporting.\n >(conservative = 5, moderate = 10, aggressive = 20).\n\n>Risk = Probability that at least one person in the group is infected 1-(1-PI)^n.\n>PI = (Number active covid cases in county × Estimation bias) / (county population).\n>n = group size.\n\n>Note: For New York City figures specify 'New York City' under Counties.",
+                                    ">Estimation Bias = The value we multiply the number of active cases by to account for under reporting.\n >(none= 1conservative = 5, moderate = 10, aggressive = 20).\n\n>Risk = Probability that at least one person in the group is infected 1-(1-PI)^n.\n>PI = (Number active covid cases in county × Estimation bias) / (county population).\n>n = group size.\n\n>Note: For New York City figures specify 'New York City' under Counties.",
                                     style={"white-space": "pre", "font-size":"13px"}
                                     ),
                        
@@ -73,24 +77,77 @@ app.layout = html.Div(
               state=[State('state_county', 'value'), State('bias', 'value'), State('group_size', 'value')]
               )
 def update_graph(n_clicks, state_county, bias, group_size):
-    try:
-        max_group_size = int(group_size)
-        region_info = [x.split(': ') for x in state_county]
-        counties = []
-        states = []
+#    try:
+    max_group_size = int(group_size)
+    region_info = [x.split(': ') for x in state_county]
+    counties = []
+    states = []
 
-        for val in region_info:
-            states.append(val[0])
-            counties.append(val[1])
+    for val in region_info:
+        states.append(val[0])
+        counties.append(val[1])
 
-        risk_df = get_risk(census_df, covid_df, states, counties, bias, max_group_size)
+    risk_df = get_risk(census_df, covid_df, states, counties, bias, max_group_size)
+    time_series_df = get_time_series(covid_df, state_county, int(bias))
 
-        fig = px.line(risk_df, x="Group_Size", y="Risk", \
-                      color='State/County', width=850, height=650, title="Current Covid Risk % by Group Size")
+    fig = px.line(risk_df,
+                  x="Group_Size",
+                  y="Risk",
+                  color='State/County',
+                  width=650,
+                  height=550,
+                  title="Current Covid Risk % by Group Size")
+    fig.update_layout(
+                      legend=dict(
+                                  x=0,
+                                  y=1,
+                                  traceorder="reversed",
+                                  title_font_family="Times New Roman",
+                                  font=dict(
+                                            family="Courier",
+                                            size=9,
+                                            color="black"
+                                            ),
+                                  bgcolor="LightSteelBlue",
+#                                  bordercolor="Black",
+#                                  borderwidth=2
+                                  )
+                     )
 
-        return dcc.Graph(id='Risk', figure=fig)
-    except:
-        return "Error: Unable to graph data. Please select a valid State/County"
+#    fig.update_traces(marker=dict(size=9,
+#                                  line=dict(width=1,
+#                                            color='DarkSlateGrey')),
+#                      selector=dict(mode='markers'))
+
+    fig2 = px.line(time_series_df, x="date",
+                   y="new cases",
+                   width=550,
+                   height=450,
+                   facet_col="state_county",
+                   facet_col_wrap=1,
+                   color='state_county')
+
+#    fig2.update_layout(
+#                       legend=dict(
+#                                   x=0,
+#                                   y=1,
+#                                   traceorder="reversed",
+#                                   title_font_family="Times New Roman",
+#                                   font=dict(
+#                                             family="Courier",
+#                                             size=10,
+#                                             color="black"
+#                                             ),
+#                                   bgcolor="LightSteelBlue",
+#                                   )
+#                      )
+    fig2.update_yaxes(matches=None)
+#    fig.show()
+
+
+    return dcc.Graph(id='Risk', figure=fig), dcc.Graph(id='idk', figure=fig2)
+#    except:
+#        return "Error: Unable to graph data. Please select a valid State/County"
 
 @app.server.route("/get_disclaimer")
 def get_disclaimer():
