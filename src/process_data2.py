@@ -1,13 +1,12 @@
 import pandas as pd
 
 def get_time_series(df, location_list, estimation_bias):
-    df['date'] = pd.to_datetime(df.date)
     df2 = df[df.date > '2020-03-16'].copy()
 	
     dfs = [df2[df2.location == item].copy() for item in location_list]
 	
     for data in dfs:
-        data['daily_increase'] = abs(data.cases.diff() * estimation_bias)
+        data['daily_increase'] = abs(data.cases.diff())
         data['new cases'] = data.daily_increase.rolling(7).mean()
 	
     return pd.concat(dfs)

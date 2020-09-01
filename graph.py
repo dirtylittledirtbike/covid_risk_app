@@ -9,13 +9,16 @@ from src.process_data2 import get_time_series
 import plotly.express as px
 import flask
 
+# --- preprocessing ---
 covid_df = pd.read_csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv')
 covid_df = covid_df[(covid_df.county !='Unknown') & (covid_df.state != 'Puerto Rico') & (covid_df.state != 'Virgin Islands')].copy()
 census_df = pd.read_csv('https://raw.githubusercontent.com/dirtylittledirtbike/census_data/master/census_formatted3.csv')
 county_state_vals = covid_df.state + ': ' + covid_df.county
+covid_df['date'] = pd.to_datetime(covid_df.date, format='%Y-%m-%d')
 
 covid_df['location'] = covid_df.state + ': ' + covid_df.county
 census_df['location'] = census_df.state + ': ' + census_df.county
+# --- preprocessing ---
 
 HERE = Path(__file__).parent
 app = dash.Dash()
@@ -41,7 +44,7 @@ app.layout = html.Div(
                                               ),
                                  
                                  html.Div([
-                                           html.P('Max Group Size:', style={"margin-top":"0%","margin-bottom": "auto"}),
+                                           html.P('Max Group Size:', style={"marginTop":"0%","marginBottom": "auto"}),
                                            dcc.Input(id="group_size", type="number",value='100', style={'width':'25%'}),
                                            html.Button(id='submit-button-state', children='Submit', style={'width':'25%'}),
                                            ], style={'display':'inline'})
@@ -50,22 +53,22 @@ app.layout = html.Div(
                                 style={'width':'30%', 'height':'auto', 'display':'grid', 'width':'40%'}
                                 ),
                        
-                       html.Div(id='output-graph', style = {'display':'flex'}),
+                       html.Div(id='output-graph', style = {'display':'flex'} ),
 #                       html.Div(id='output-graph', style = {'columnCount': 2, 'height':'auto', 'width':'auto'}),
 #                       html.Div(id='output-graph2'),
                        
-                       html.P(' ', style={"height": "auto","margin-bottom": "auto", "font-size":"35px"}),
+#                       html.P(' ', style={"height": "auto","marginBottom": "auto", "fontSize":"35px"}),
                        
                        dcc.Markdown(
-                                    ">Estimation Bias = The value we multiply the number of active cases by to account for under reporting.\n >(none= 1conservative = 5, moderate = 10, aggressive = 20).\n\n>Risk = Probability that at least one person in the group is infected 1-(1-PI)^n.\n>PI = (Number active covid cases in county × Estimation bias) / (county population).\n>n = group size.\n\n>Note: For New York City figures specify 'New York City' under Counties.",
-                                    style={"white-space": "pre", "font-size":"13px"}
+                                    ">Estimation Bias = The value we multiply the number of active cases by to account for under reporting.\n >(None= 1, conservative = 5, moderate = 10, aggressive = 20).\n\n>Risk = Probability that at least one person in the group is infected 1-(1-PI)^n.\n>PI = (Number active covid cases in county × Estimation bias) / (county population).\n>n = group size.\n\n>Note: For New York City figures specify 'New York City' under Counties.",
+                                    style={"whiteSpace": "pre", "fontSize":"13px"}
                                     ),
                        
-                       html.P(' ', style={"height": "auto","margin-bottom": "auto", "font-size":"35px"}),
+                       html.P(' ', style={"height": "auto","marginBottom": "auto", "fontSize":"35px"}),
 
                        dcc.Markdown(
                                     "Figures updated daily, for questions contact cwestnedge@gmail.com. [Disclaimer](/get_disclaimer 'These figures are just estimates based on data that most likely does not capture the full picture. There are many unknowns due to under reporting and imperfect data that require a number of assumptions to be made in creating this model. The intent is to simply visualize our estimates and quantify risk based on the available data. This model does not claim to fully depict the actual population, but instead serves as an estimate').",
-                                    style={"white-space": "pre", "font-size":"11px"}
+                                    style={"whiteSpace": "pre", "fontSize":"11px"}
                                     ),
                        
                        # hidden div
@@ -89,9 +92,10 @@ def update_graph(n_clicks, state_county, bias, group_size):
                   x="Group_Size",
                   y="Risk",
                   color='location',
-                  width=650,
-                  height=550,
+                  width=700,
+                  height=600,
                   title="Current Covid Risk % by Group Size")
+                  
     fig.update_layout(
                       legend=dict(
                                   x=0,
@@ -116,8 +120,8 @@ def update_graph(n_clicks, state_county, bias, group_size):
 
     fig2 = px.line(time_series_df, x="date",
                    y="new cases",
-                   width=550,
-                   height=450,
+                   width=500,
+                   height=700,
                    facet_col="location",
                    facet_col_wrap=1,
                    color='location')
