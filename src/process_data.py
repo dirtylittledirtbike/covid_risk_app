@@ -7,8 +7,8 @@ def get_risk(df1, df2, locations_list, bias, max_group_size):
     census_df = df1
     us_df = df2
     
-    def get_population(location):
-        return census_df[census_df.location == location]['population'].values[0]
+    def get_population(loc):
+        return census_df[census_df.Location == loc]['population'].values[0]
     
     county_population_sizes = []
     
@@ -18,7 +18,7 @@ def get_risk(df1, df2, locations_list, bias, max_group_size):
     county_dfs = []
 
     for loc in locations_list:
-        temp = us_df[us_df.location == loc].copy()
+        temp = us_df[us_df.Location == loc].copy()
         county_dfs.append(temp)
     
     last_fourteen_days = []
@@ -37,12 +37,12 @@ def get_risk(df1, df2, locations_list, bias, max_group_size):
     new_dfs = []
     for i in range(len(locations_list)):
         df = pd.DataFrame({'Risk': prob_arrs[i]})
-        df['location'] = locations_list[i]
+        df['Location'] = locations_list[i]
         new_dfs.append(df)
 
     risk_df = pd.concat(new_dfs)
     risk_df2 = risk_df.reset_index()
-    risk_df2.columns = ['Group_Size' if x=='index' else x for x in risk_df2.columns]
+    risk_df2.columns = ['Group Size' if x=='index' else x for x in risk_df2.columns]
 
     return risk_df2
 
@@ -57,8 +57,8 @@ if __name__ == '__main__':
                         
     census_df = pd.read_csv('https://raw.githubusercontent.com/dirtylittledirtbike/census_data/master/census_formatted3.csv')
     
-    covid_df['location'] = covid_df.state + ': ' + covid_df.county
-    census_df['location'] = census_df.state + ': ' + census_df.county
+    covid_df['Location'] = covid_df.state + ': ' + covid_df.county
+    census_df['Location'] = census_df.state + ': ' + census_df.county
 
     locations_list = ['Illinois: Cook', 'Texas: Harris', 'Louisiana: Orleans', 'Texas: Travis']
     estimation_bias = int(10)
@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
     risk_df = get_risk(census_df, covid_df, locations_list, estimation_bias, max_group_size)
 
-    fig2 = px.line(risk_df, x="Group_Size", y="Risk",\
-                   color='location', width=800, height=700, title="Current Covid Risk % by Group Size")
+    fig2 = px.line(risk_df, x="Group Size", y="Risk",\
+                   color='Location', width=800, height=700, title="Current Covid Risk % by Group Size")
 
     fig2.show()

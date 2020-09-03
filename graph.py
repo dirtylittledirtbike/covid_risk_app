@@ -9,19 +9,51 @@ from src.process_data2 import get_time_series
 import plotly.express as px
 import flask
 
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
 # --- preprocessing ---
 covid_df = pd.read_csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv')
 covid_df = covid_df[(covid_df.county !='Unknown') & (covid_df.state != 'Puerto Rico') & (covid_df.state != 'Virgin Islands')].copy()
 census_df = pd.read_csv('https://raw.githubusercontent.com/dirtylittledirtbike/census_data/master/census_formatted3.csv')
 county_state_vals = covid_df.state + ': ' + covid_df.county
-covid_df['date'] = pd.to_datetime(covid_df.date, format='%Y-%m-%d')
+covid_df['Date'] = pd.to_datetime(covid_df.date, format='%Y-%m-%d')
 
-covid_df['location'] = covid_df.state + ': ' + covid_df.county
-census_df['location'] = census_df.state + ': ' + census_df.county
+covid_df['Location'] = covid_df.state + ': ' + covid_df.county
+census_df['Location'] = census_df.state + ': ' + census_df.county
 # --- preprocessing ---
 
 HERE = Path(__file__).parent
 app = dash.Dash()
+
+app.index_string = """<!DOCTYPE html>
+    <html>
+        <head>
+            <!-- Global site tag (gtag.js) - Google Analytics -->
+            <script async src="https://www.googletagmanager.com/gtag/js?id=UA-177209054-1"></script>
+            <script>
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+            
+                gtag('config', 'UA-177209054-1');
+            </script>
+
+            {%metas%}
+            <title>{%title%}</title>
+            {%favicon%}
+            {%css%}
+        </head>
+        <body>
+            {%app_entry%}
+            <footer>
+                {%config%}
+                {%scripts%}
+                {%renderer%}
+            </footer>
+        </body>
+    </html>"""
+
 app.title = '🎠'
 app.layout = html.Div(
                       [
@@ -53,12 +85,8 @@ app.layout = html.Div(
                                 style={'width':'30%', 'height':'auto', 'display':'grid', 'width':'40%'}
                                 ),
                        
-                       html.Div(id='output-graph', style = {'display':'flex'} ),
-#                       html.Div(id='output-graph', style = {'columnCount': 2, 'height':'auto', 'width':'auto'}),
-#                       html.Div(id='output-graph2'),
-                       
-#                       html.P(' ', style={"height": "auto","marginBottom": "auto", "fontSize":"35px"}),
-                       
+                       html.Div(id='output-graph', style = {'display':'flex'}),
+
                        dcc.Markdown(
                                     ">Estimation Bias = The value we multiply the number of active cases by to account for under reporting.\n >(None= 1, conservative = 5, moderate = 10, aggressive = 20).\n\n>Risk = Probability that at least one person in the group is infected 1-(1-PI)^n.\n>PI = (Number active covid cases in county × Estimation bias) / (county population).\n>n = group size.\n\n>Note: For New York City figures specify 'New York City' under Counties.",
                                     style={"whiteSpace": "pre", "fontSize":"13px"}
@@ -69,10 +97,7 @@ app.layout = html.Div(
                        dcc.Markdown(
                                     "Figures updated daily, for questions contact cwestnedge@gmail.com. [Disclaimer](/get_disclaimer 'These figures are just estimates based on data that most likely does not capture the full picture. There are many unknowns due to under reporting and imperfect data that require a number of assumptions to be made in creating this model. The intent is to simply visualize our estimates and quantify risk based on the available data. This model does not claim to fully depict the actual population, but instead serves as an estimate').",
                                     style={"whiteSpace": "pre", "fontSize":"11px"}
-                                    ),
-                       
-                       # hidden div
-#                       html.Div(id='intermediate-value', style={'display': 'none'})
+                                    )
                        
                       ],
                       )
@@ -89,60 +114,48 @@ def update_graph(n_clicks, state_county, bias, group_size):
     time_series_df = get_time_series(covid_df, state_county, int(bias))
     
     fig = px.line(risk_df,
-                  x="Group_Size",
+                  x="Group Size",
                   y="Risk",
-                  color='location',
+                  color='Location',
                   width=700,
                   height=600,
-                  title="Current Covid Risk % by Group Size")
+                  title="Current Covid Risk % by Group Size"
+                  )
                   
-    fig.update_layout(
-                      legend=dict(
-                                  x=0,
-                                  y=1,
-                                  traceorder="reversed",
-                                  title_font_family="Times New Roman",
-                                  font=dict(
-                                            family="Courier",
-                                            size=9,
-                                            color="black"
-                                            ),
-                                  bgcolor="LightSteelBlue",
-#                                  bordercolor="Black",
-#                                  borderwidth=2
-                                  )
-                     )
+    fig.update_layout(font_family="Times New Roman",
+                      hovermode='x')
 
-#    fig.update_traces(marker=dict(size=9,
-#                                  line=dict(width=1,
-#                                            color='DarkSlateGrey')),
-#                      selector=dict(mode='markers'))
+    fig2 = make_subplots(rows=len(state_county),
+                         cols=1,
+                         subplot_titles=state_county,
+                         shared_yaxes=False,
+                         vertical_spacing=0.09)
+    
+    # iterate over state-county list and create new stacked bar/scatter subplots
+    # for each state/county
+    for i, loc in enumerate(state_county):
+            
+        fig2.append_trace(go.Scatter(customdata=time_series_df[time_series_df.Location==loc]['daily_increase'],
+                                     hovertemplate="%{x}<br><br>New Cases: %{customdata}<br>7-Day rolling average: %{y}<extra></extra>",
+                                     x=time_series_df[time_series_df.Location == loc].Date,
+                                     y=time_series_df[time_series_df.Location == loc]['New Cases'],
+                                     ), row=i+1, col=1)
+            
+        fig2.append_trace(go.Bar(hoverinfo='none',
+                                 x=time_series_df[time_series_df.Location == loc].Date,
+                                 y=time_series_df[time_series_df.Location == loc]['daily_increase']
+                                 ),row=i+1, col=1)
 
-    fig2 = px.line(time_series_df, x="date",
-                   y="new cases",
-                   width=500,
-                   height=700,
-                   facet_col="location",
-                   facet_col_wrap=1,
-                   color='location')
-
-#    fig2.update_layout(
-#                       legend=dict(
-#                                   x=0,
-#                                   y=1,
-#                                   traceorder="reversed",
-#                                   title_font_family="Times New Roman",
-#                                   font=dict(
-#                                             family="Courier",
-#                                             size=10,
-#                                             color="black"
-#                                             ),
-#                                   bgcolor="LightSteelBlue",
-#                                   )
-#                      )
-    fig2.update_yaxes(matches=None)
-    fig2.update_layout(showlegend=False)
-#    fig.show()
+    # this is where you can adjust the fontsize for the subplot titles
+    for i in fig2['layout']['annotations']:
+        i['font'] = dict(size=11)
+    
+    fig2.update_layout(height=700,
+                       width=500,
+                       title_text="Daily Change",
+                       font_family="Times New Roman",
+                       showlegend=False,
+                       hovermode='x')
 
 
     return dcc.Graph(id='Risk', figure=fig), dcc.Graph(id='idk', figure=fig2)
