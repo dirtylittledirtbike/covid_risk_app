@@ -7,6 +7,7 @@ import pandas as pd
 from src.process_data import get_risk
 from src.process_data2 import get_time_series
 import plotly.express as px
+from src.google_analytics import gtag
 import flask
 
 import plotly.graph_objects as go
@@ -26,33 +27,7 @@ census_df['Location'] = census_df.state + ': ' + census_df.county
 HERE = Path(__file__).parent
 app = dash.Dash()
 
-app.index_string = """<!DOCTYPE html>
-    <html>
-        <head>
-            <!-- Global site tag (gtag.js) - Google Analytics -->
-            <script async src="https://www.googletagmanager.com/gtag/js?id=UA-177209054-1"></script>
-            <script>
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-            
-                gtag('config', 'UA-177209054-1');
-            </script>
-
-            {%metas%}
-            <title>{%title%}</title>
-            {%favicon%}
-            {%css%}
-        </head>
-        <body>
-            {%app_entry%}
-            <footer>
-                {%config%}
-                {%scripts%}
-                {%renderer%}
-            </footer>
-        </body>
-    </html>"""
+app.index_string = gtag
 
 app.title = '🎠'
 app.layout = html.Div(
