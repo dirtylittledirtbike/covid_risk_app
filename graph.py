@@ -5,16 +5,30 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import pandas as pd
 from src.process_data import get_risk
+from src.process_data2 import get_time_series
 import plotly.express as px
+from src.google_analytics import gtag
 import flask
 
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+# --- preprocessing ---
 covid_df = pd.read_csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv')
 covid_df = covid_df[(covid_df.county !='Unknown') & (covid_df.state != 'Puerto Rico') & (covid_df.state != 'Virgin Islands')].copy()
 census_df = pd.read_csv('https://raw.githubusercontent.com/dirtylittledirtbike/census_data/master/census_formatted3.csv')
 county_state_vals = covid_df.state + ': ' + covid_df.county
+covid_df['Date'] = pd.to_datetime(covid_df.date, format='%Y-%m-%d')
+
+covid_df['Location'] = covid_df.state + ': ' + covid_df.county
+census_df['Location'] = census_df.state + ': ' + census_df.county
+# --- preprocessing ---
 
 HERE = Path(__file__).parent
 app = dash.Dash()
+
+app.index_string = gtag
+
 app.title = '🎠'
 app.layout = html.Div(
                       [
@@ -29,6 +43,7 @@ app.layout = html.Div(
                                  html.Label('Estimation Bias:'),
                                  dcc.Dropdown(id='bias', value='10',
                                               options=[
+                                                       {'label': 'None', 'value': '1'},
                                                        {'label': 'Conservative', 'value': '5'},
                                                        {'label': 'Moderate', 'value': '10'},
                                                        {'label': 'Aggressive', 'value': '20'}
@@ -36,7 +51,7 @@ app.layout = html.Div(
                                               ),
                                  
                                  html.Div([
-                                           html.P('Max Group Size:', style={"margin-top":"0%","margin-bottom": "auto"}),
+                                           html.P('Max Group Size:', style={"marginTop":"0%","marginBottom": "auto"}),
                                            dcc.Input(id="group_size", type="number",value='100', style={'width':'25%'}),
                                            html.Button(id='submit-button-state', children='Submit', style={'width':'25%'}),
                                            ], style={'display':'inline'})
@@ -45,24 +60,19 @@ app.layout = html.Div(
                                 style={'width':'30%', 'height':'auto', 'display':'grid', 'width':'40%'}
                                 ),
                        
-                       html.Div(id='output-graph'),
-                       
-                       html.P(' ', style={"height": "auto","margin-bottom": "auto", "font-size":"35px"}),
-                       
+                       html.Div(id='output-graph', style = {'display':'flex'}),
+
                        dcc.Markdown(
-                                    ">Estimation Bias = The value we multiply the number of active cases by to account for under reporting.\n >(conservative = 5, moderate = 10, aggressive = 20).\n\n>Risk = Probability that at least one person in the group is infected 1-(1-PI)^n.\n>PI = (Number active covid cases in county × Estimation bias) / (county population).\n>n = group size.\n\n>Note: For New York City figures specify 'New York City' under Counties.",
-                                    style={"white-space": "pre", "font-size":"13px"}
+                                    ">Estimation Bias = The value we multiply the number of active cases by to account for under reporting.\n >(None= 1, conservative = 5, moderate = 10, aggressive = 20).\n\n>Risk = Probability that at least one person in the group is infected 1-(1-PI)^n.\n>PI = (Number active covid cases in county × Estimation bias) / (county population).\n>n = group size.\n\n>Note: For New York City figures specify 'New York City' under Counties.",
+                                    style={"whiteSpace": "pre", "fontSize":"13px"}
                                     ),
                        
-                       html.P(' ', style={"height": "auto","margin-bottom": "auto", "font-size":"35px"}),
+                       html.P(' ', style={"height": "auto","marginBottom": "auto", "fontSize":"35px"}),
 
                        dcc.Markdown(
                                     "Figures updated daily, for questions contact cwestnedge@gmail.com. [Disclaimer](/get_disclaimer 'These figures are just estimates based on data that most likely does not capture the full picture. There are many unknowns due to under reporting and imperfect data that require a number of assumptions to be made in creating this model. The intent is to simply visualize our estimates and quantify risk based on the available data. This model does not claim to fully depict the actual population, but instead serves as an estimate').",
-                                    style={"white-space": "pre", "font-size":"11px"}
-                                    ),
-                       
-                       # hidden div
-#                       html.Div(id='intermediate-value', style={'display': 'none'})
+                                    style={"whiteSpace": "pre", "fontSize":"11px"}
+                                    )
                        
                       ],
                       )
@@ -73,24 +83,59 @@ app.layout = html.Div(
               state=[State('state_county', 'value'), State('bias', 'value'), State('group_size', 'value')]
               )
 def update_graph(n_clicks, state_county, bias, group_size):
-    try:
-        max_group_size = int(group_size)
-        region_info = [x.split(': ') for x in state_county]
-        counties = []
-        states = []
+#    try:
+    max_group_size = int(group_size)
+    risk_df = get_risk(census_df, covid_df, state_county, int(bias), max_group_size)
+    time_series_df = get_time_series(covid_df, state_county, int(bias))
+    
+    fig = px.line(risk_df,
+                  x="Group Size",
+                  y="Risk",
+                  color='Location',
+                  width=700,
+                  height=600,
+                  title="Current Covid Risk % by Group Size"
+                  )
+                  
+    fig.update_layout(font_family="Times New Roman",
+                      hovermode='x')
 
-        for val in region_info:
-            states.append(val[0])
-            counties.append(val[1])
+    fig2 = make_subplots(rows=len(state_county),
+                         cols=1,
+                         subplot_titles=state_county,
+                         shared_yaxes=False,
+                         vertical_spacing=0.09)
+    
+    # iterate over state-county list and create new stacked bar/scatter subplots
+    # for each state/county
+    for i, loc in enumerate(state_county):
+            
+        fig2.append_trace(go.Scatter(customdata=time_series_df[time_series_df.Location==loc]['daily_increase'],
+                                     hovertemplate="%{x}<br><br>New Cases: %{customdata}<br>7-Day rolling average: %{y}<extra></extra>",
+                                     x=time_series_df[time_series_df.Location == loc].Date,
+                                     y=time_series_df[time_series_df.Location == loc]['New Cases'],
+                                     ), row=i+1, col=1)
+            
+        fig2.append_trace(go.Bar(hoverinfo='none',
+                                 x=time_series_df[time_series_df.Location == loc].Date,
+                                 y=time_series_df[time_series_df.Location == loc]['daily_increase']
+                                 ),row=i+1, col=1)
 
-        risk_df = get_risk(census_df, covid_df, states, counties, bias, max_group_size)
+    # this is where you can adjust the fontsize for the subplot titles
+    for i in fig2['layout']['annotations']:
+        i['font'] = dict(size=11)
+    
+    fig2.update_layout(height=700,
+                       width=500,
+                       title_text="Daily Change",
+                       font_family="Times New Roman",
+                       showlegend=False,
+                       hovermode='x')
 
-        fig = px.line(risk_df, x="Group_Size", y="Risk", \
-                      color='State/County', width=850, height=650, title="Current Covid Risk % by Group Size")
 
-        return dcc.Graph(id='Risk', figure=fig)
-    except:
-        return "Error: Unable to graph data. Please select a valid State/County"
+    return dcc.Graph(id='Risk', figure=fig), dcc.Graph(id='idk', figure=fig2)
+#    except:
+#        return "Error: Unable to graph data. Please select a valid State/County"
 
 @app.server.route("/get_disclaimer")
 def get_disclaimer():
