@@ -125,12 +125,22 @@ def update_graph(n_clicks, state_county, bias, group_size):
     for i in fig2['layout']['annotations']:
         i['font'] = dict(size=11)
     
-    fig2.update_layout(height=700,
-                       width=500,
-                       title_text="Daily Change",
-                       font_family="Times New Roman",
-                       showlegend=False,
-                       hovermode='x')
+    # make time series smaller if you're only plotting one county
+    # it just looks nicer this way.
+    if len(state_county) == 1:
+        fig2.update_layout(height=415,
+                           width=500,
+                           title_text="Daily Change",
+                           font_family="Times New Roman",
+                           showlegend=False,
+                           hovermode='x')
+    else:
+        fig2.update_layout(height=700,
+                           width=500,
+                           title_text="Daily Change",
+                           font_family="Times New Roman",
+                           showlegend=False,
+                           hovermode='x')
 
 
     return dcc.Graph(id='Risk', figure=fig), dcc.Graph(id='idk', figure=fig2)
