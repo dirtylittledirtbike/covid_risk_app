@@ -1,8 +1,6 @@
 import pandas as pd
 from scipy.stats import binom
 
-from scipy.stats import binom
-
 def get_risk(df1, df2, locations_list, bias, max_group_size):
     census_df = df1
     us_df = df2
